@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Simulator</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    deepBlue: '#0A1128',
+                    techGreen: '#00FF66',
+                    neonBlue: '#00E5FF',
+                    darkSlate: '#1E293B',
+                    warningOrange: '#FF9800',
+                    dangerRed: '#FF4F5E'
+                },
+                fontFamily: {
+                    sans: ['Space Grotesk', 'sans-serif'],
+                    mono: ['JetBrains Mono', 'monospace'],
+                }
+            }
+        }
+    }
+</script>
+
+<!-- Custom CSS for components and overrides -->
+<style>
+    body { background-color: #0A1128; color: #F8FAFC; }
+    
+    .bg-grid-pattern {
+        background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E");
+    }
+    
+    .glass {
+        background: rgba(10, 17, 40, 0.75);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    }
+    
+    .glass-panel {
+        background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        border-left: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .text-glow-green { text-shadow: 0 0 15px rgba(0, 255, 102, 0.6); }
+    .text-glow-blue { text-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
+    .box-glow:hover { box-shadow: 0 0 25px rgba(0, 255, 102, 0.2); }
+    .box-glow-blue:hover { box-shadow: 0 0 25px rgba(0, 229, 255, 0.3); }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00FF66; }
+    
+    /* Canvas */
+    #canvas-container canvas { width: 100% !important; height: 100% !important; display: block; outline: none; }
+    
+    /* Range Slider */
+    input[type=range] { -webkit-appearance: none; background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px; outline: none; }
+    input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #00FF66; cursor: pointer; box-shadow: 0 0 10px rgba(0, 255, 102, 0.5); }
+    
+    /* Speed buttons active state */
+    .speed-btn { transition: all 0.2s; }
+    .speed-btn.active {
+        background-color: #00E5FF !important;
+        color: #0A1128 !important;
+        border-color: #00E5FF !important;
+        font-weight: 700 !important;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.4) !important;
+    }
+    
+    /* Legacy color classes mapped to VAYU theme for JS compatibility */
+    .color-spool { color: #94a0b8 !important; }
+    .color-climb { color: #00E5FF !important; }
+    .color-trans { color: #FF9800 !important; }
+    .color-cruise { color: #00FF66 !important; }
+    .color-desc { color: #FF4F5E !important; }
+    
+    .value.green { color: #00FF66 !important; }
+    .value.orange { color: #FF9800 !important; }
+    .value.red { color: #FF4F5E !important; }
+    
+    .chart-legend .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        display: inline-block;
+    }
+</style>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/math/ConvexHull.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/ConvexGeometry.js"></script>
+</head>
+<body class="antialiased bg-deepBlue text-slate-100 bg-grid-pattern relative selection:bg-techGreen selection:text-deepBlue overflow-x-hidden">
+
+  <!-- NAVIGATION BAR -->
+    <!-- NAVIGATION BAR -->
+  <header class="fixed w-full top-0 z-50 glass border-b border-white/5">
+      <div class="w-full flex items-center justify-between px-6 py-4">
+          
+          <!-- Left Column (Logo) -->
+          <div class="flex-1 flex justify-start items-center">
+              <div class="text-2xl font-bold tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-techGreen to-neonBlue text-glow-green">
+                  HL-150 // SIM
+              </div>
+          </div>
+          
+          <!-- Center Column (Navigation) -->
+          <div class="flex-none flex justify-center gap-4" id="nav-links">
+              <a href="../Landing_Page.html#" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Home</a>
+              <a href="#" id="nav-sim" onclick="showSimulator()" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-neonBlue border border-neonBlue rounded bg-transparent hover:bg-neonBlue hover:text-deepBlue hover:border-neonBlue transition-all duration-300 box-glow-blue shadow-[0_0_15px_rgba(0,229,255,0.3)]">Simulator</a>
+              <a href="../Dashboard/Dashboard.html" id="nav-dashboard" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Dashboard</a>
+          </div>
+
+          <!-- Right Column (Status/Info) -->
+          <div class="flex-1 flex justify-end items-center text-right">
+              <!-- Empty placeholder to maintain 3-column flex balance -->
+          </div>
+          
+      </div>
+  </header>
+
+  <!-- SIMULATOR VIEWPORT -->
+  <div id="simulator-viewport" class="relative w-screen h-screen overflow-hidden">
+    <!-- 3D CANVAS -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+    
+    <!-- PHASE BANNER OVERLAY -->
+    <div class="absolute top-[90px] left-1/2 transform -translate-x-1/2 pointer-events-none z-20 font-mono text-sm md:text-base tracking-widest uppercase text-techGreen text-glow-green whitespace-nowrap" id="phase-banner">
+        PHASE 1 · VERTICAL CLIMB
+    </div>
+
+    <!-- VIEW TOGGLE -->
+    <div class="absolute top-[90px] right-6 lg:right-[380px] z-20 pointer-events-auto">
+      <button id="view-btn" onclick="toggleView()" class="px-4 py-2 rounded border border-white/15 bg-black/50 backdrop-blur-md text-white font-mono text-xs tracking-wider uppercase hover:bg-white/10 transition-colors">
+          👁 VIEW: 3RD PERSON
+      </button>
+    </div>
+
+    <!-- UI LAYER -->
+    <div id="ui-layer" class="absolute inset-0 z-10 pointer-events-none flex flex-col pt-[140px] pb-6 px-6 lg:px-8">
+        
+        <div class="flex flex-col lg:flex-row justify-between h-full gap-6 relative">
+            
+            <!-- LEFT PANEL -->
+            <div class="panel left-panel glass rounded-xl p-6 w-full lg:w-[360px] max-h-[calc(100vh-160px)] overflow-y-auto pointer-events-auto flex flex-col gap-6">
+                <div>
+                    <div class="font-mono text-xs text-neonBlue tracking-widest uppercase mb-1">01 — FLIGHT TEST</div>
+                    <div class="text-2xl font-bold text-white">Transition bench</div>
+                </div>
+
+                <div class="params-box space-y-4">
+                    <h4 class="text-xs text-slate-400 uppercase tracking-widest font-mono border-b border-white/5 pb-2">Mission Parameters</h4>
+                    
+                    <div class="flex items-center gap-3 text-sm">
+                        <label class="w-32 text-slate-400">Transition</label>
+                        <input type="range" id="param-transdur" min="2" max="15" value="6" step="0.5" class="flex-grow">
+                        <span id="val-transdur" class="font-mono text-techGreen font-semibold w-12 text-right">6.0 s</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <label class="w-32 text-slate-400">Payload</label>
+                        <input type="range" id="param-payload" min="0" max="200" value="80" step="5" class="flex-grow">
+                        <span id="val-payload" class="font-mono text-techGreen font-semibold w-12 text-right">80 kg</span>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <label class="w-32 text-slate-400">Cruise speed</label>
+                        <input type="range" id="param-cruisespeed" min="80" max="200" value="120" step="5" class="flex-grow">
+                        <span id="val-cruise" class="font-mono text-techGreen font-semibold w-16 text-right">120<small>km/h</small></span>
+                    </div>
+                    <div class="flex items-center gap-3 text-sm">
+                        <label class="w-32 text-slate-400">Altitude</label>
+                        <input type="range" id="param-cruisealt" min="20" max="300" value="75" step="1" class="flex-grow">
+                        <span id="val-cruisealt" class="font-mono text-techGreen font-semibold w-12 text-right">75 m</span>
+                    </div>
+                </div>
+
+                <!-- Play / Reset -->
+                <div class="flex gap-3 mt-2">
+                    <button id="play-btn" class="flex-1 py-2.5 rounded border border-techGreen/50 bg-techGreen/10 text-techGreen font-mono text-sm font-semibold hover:bg-techGreen hover:text-deepBlue transition-colors uppercase tracking-wider box-glow">
+                        ▶ Playing
+                    </button>
+                    <button id="reset-btn" class="flex-1 py-2.5 rounded border border-white/20 bg-white/5 text-white font-mono text-sm font-semibold hover:bg-white/15 transition-colors uppercase tracking-wider">
+                        ↻ Reset
+                    </button>
+                </div>
+
+                <!-- Speed Controls -->
+                <div class="flex gap-2">
+                    <button class="speed-btn px-4 py-1.5 rounded border border-white/10 bg-white/5 text-slate-400 font-mono text-xs hover:text-white" data-speed="0.25">0.25×</button>
+                    <button class="speed-btn active px-4 py-1.5 rounded border border-white/10 bg-white/5 text-slate-400 font-mono text-xs hover:text-white" data-speed="1">1×</button>
+                    <button class="speed-btn px-4 py-1.5 rounded border border-white/10 bg-white/5 text-slate-400 font-mono text-xs hover:text-white" data-speed="2">2×</button>
+                </div>
+
+                <!-- Precession Status Box -->
+                <div class="border border-neonBlue/30 rounded-lg p-5 bg-neonBlue/5 shadow-[0_0_15px_rgba(0,229,255,0.05)] mt-2">
+                    <div class="font-mono text-[11px] font-bold text-neonBlue mb-3 tracking-wide leading-relaxed">
+                        【STATUS: PRECESSION NEUTRALIZED — CW/CCW HARMONIC BALANCE】
+                    </div>
+                    <div class="text-xs text-slate-400 leading-relaxed mb-4">
+                        Both ducts tilt at the same rate but spin in opposite directions, so their gyroscopic reaction torques cancel out at the airframe.
+                    </div>
+                    <div class="font-mono text-xs text-warningOrange mb-1">τ_gyro = K(payload) × Ω_tilt</div>
+                    <div id="formula-val" class="font-mono text-xs text-slate-300 pl-4 mb-3">&nbsp;&nbsp;&nbsp;&nbsp;0.0 N·m per motor</div>
+                    <div class="font-mono text-xs text-warningOrange mb-1">Σ τ_net = τ_CW + τ_CCW</div>
+                    <div id="formula-net" class="font-mono text-xs text-slate-300 pl-4">&nbsp;&nbsp;&nbsp;&nbsp;(+0.0) + (0.0) = 0.0 N·m</div>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL -->
+            <div class="panel side-panel right glass rounded-xl p-6 w-full lg:w-[360px] max-h-[calc(100vh-160px)] overflow-y-auto pointer-events-auto flex flex-col gap-6 lg:absolute lg:right-0">
+                <h3 class="text-xs font-semibold uppercase tracking-widest text-slate-400 border-b border-white/5 pb-2">Telemetry & Diagnostics</h3>
+                
+                <div class="grid grid-cols-2 gap-y-6 gap-x-4">
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">FLIGHT PHASE</span>
+                        <span id="readout-phase" class="value font-mono text-xl font-bold text-techGreen">SPOOL UP</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">VELOCITY</span>
+                        <span id="val-vel" class="value font-mono text-xl font-bold text-warningOrange">0<small class="text-xs text-slate-400 font-normal ml-1">km/h</small></span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">ROTOR TILT ANGLE</span>
+                        <span id="readout-tilt" class="value font-mono text-xl font-bold text-white">0.0°</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">ALTITUDE (AGL)</span>
+                        <span id="val-alt" class="value font-mono text-xl font-bold text-warningOrange">0<small class="text-xs text-slate-400 font-normal ml-1">m</small></span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">SPAR TORSIONAL SHEAR</span>
+                        <span id="readout-shear" class="value font-mono text-xl font-bold text-white">0.0<small class="text-xs text-slate-400 font-normal ml-1">N·m</small></span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">GYROSCOPIC NET</span>
+                        <span id="readout-gyro" class="value font-mono text-xl font-bold text-dangerRed">0.0<small class="text-xs text-slate-400 font-normal ml-1">N·m</small></span>
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    <div class="flex gap-3 mb-3 chart-legend">
+                        <span class="font-mono text-[10px] flex items-center gap-1.5 text-slate-300"><span class="dot" style="background:#4fb3ff"></span> velocity</span>
+                        <span class="font-mono text-[10px] flex items-center gap-1.5 text-slate-300"><span class="dot" style="background:#ff9800"></span> altitude</span>
+                        <span class="font-mono text-[10px] flex items-center gap-1.5 text-slate-300"><span class="dot" style="background:#00FF66"></span> tilt</span>
+                        <span class="font-mono text-[10px] flex items-center gap-1.5 text-slate-300"><span class="dot" style="background:#ff4f5e"></span> shear</span>
+                    </div>
+                    <div class="w-full h-[150px] bg-black/30 rounded-lg border border-white/10 overflow-hidden">
+                        <canvas id="telemetry-chart" width="300" height="150" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-center mt-2 border-t border-white/10 pt-5">
+                    <div id="time-display" class="font-mono text-xs text-slate-400 pointer-events-auto">0.0s / 0.0s</div>
+                    <div class="flex gap-4">
+                        <div class="flex flex-col items-end">
+                            <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">VELOCITY</span>
+                            <span id="val-vel2" class="font-mono text-sm text-white">0<small class="text-[9px] text-slate-500 ml-1">km/h</small></span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">ALTITUDE</span>
+                            <span id="val-alt2" class="font-mono text-sm text-white">0<small class="text-[9px] text-slate-500 ml-1">m</small></span>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">BATTERY</span>
+                            <span id="val-bat" class="font-mono text-sm text-techGreen">100<small class="text-[9px] text-slate-500 ml-1">%</small></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+  <!-- END SIMULATOR VIEWPORT -->
+
+  <!-- TECHNICAL DETAILS SECTION -->
+  <div id="info-section" class="w-full min-h-screen bg-deepBlue py-24 px-6 flex justify-center border-t border-white/5 relative z-50 overflow-hidden">
+      
+      <!-- Abstract Background Glows -->
+      <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-neonBlue/30 to-transparent"></div>
+      <div class="absolute top-1/4 left-[-10%] w-[500px] h-[500px] bg-techGreen/5 rounded-full blur-[150px] pointer-events-none"></div>
+      <div class="absolute bottom-1/4 right-[-10%] w-[500px] h-[500px] bg-neonBlue/5 rounded-full blur-[150px] pointer-events-none"></div>
+
+      <div class="max-w-4xl relative z-10">
+          <div class="inline-block px-4 py-1.5 glass rounded-full border border-warningOrange/50 text-warningOrange font-mono text-xs uppercase tracking-widest mb-8 shadow-[0_0_15px_rgba(255,152,0,0.2)]">
+              <span class="mr-2 animate-pulse inline-block">●</span>DUAL COAXIAL-DUCT TILT ARCHITECTURE
+          </div>
+          
+          <h1 class="text-4xl md:text-5xl font-bold leading-tight mb-8 tracking-tight text-white">
+              Watch a heavy-lift drone <span class="text-transparent bg-clip-text bg-gradient-to-r from-warningOrange to-yellow-400">tilt</span> from hover to cruise.
+          </h1>
+          
+          <p class="text-lg md:text-xl text-slate-300 font-light leading-relaxed mb-10 border-l-4 border-neonBlue pl-6 py-2 bg-gradient-to-r from-neonBlue/10 to-transparent">
+              A dual-duct tiltrotor has to rotate two counter-spinning rotors 90° in mid-air without twisting itself apart. Scrub through the full flight — spool-up, climb, transition, cruise — and watch the gyroscopic math that keeps it stable.
+          </p>
+          
+          <div class="flex flex-wrap gap-4 md:gap-6 mb-16 font-mono text-xs md:text-sm text-slate-400 uppercase tracking-wider">
+              <span class="glass px-4 py-2 rounded border border-white/10">FOOTPRINT <span class="text-white font-bold ml-2">3.0 × 3.0 m</span></span>
+              <span class="glass px-4 py-2 rounded border border-white/10">PAYLOAD <span class="text-white font-bold ml-2">0-80 kg</span></span>
+              <span class="glass px-4 py-2 rounded border border-white/10">MTOW <span class="text-white font-bold ml-2">150 kg</span></span>
+              <span class="glass px-4 py-2 rounded border border-white/10">CRUISE <span class="text-white font-bold ml-2">120 km/h</span></span>
+          </div>
+
+          <h2 class="text-3xl font-bold text-white mb-6">The Physics of Gyroscopic Shear</h2>
+          <p class="text-lg text-slate-300 leading-relaxed mb-6 font-light">
+              When you attempt to tilt a spinning rotor, it strongly resists changing its axis of rotation due to <strong class="text-white font-medium">Gyroscopic Precession</strong>. Instead of tilting cleanly, a standard gyroscope will react by applying a massive 90-degree off-axis torque. For a heavy-lift drone transitioning to forward flight, this torque is strong enough to rip the carbon-fiber wing spars clean off the fuselage.
+          </p>
+          
+          <div class="glass-panel rounded-2xl p-8 md:p-12 text-center my-12 border border-warningOrange/30 shadow-[0_0_30px_rgba(255,152,0,0.1)] relative overflow-hidden">
+              <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-warningOrange/50 to-transparent"></div>
+              <h3 class="font-mono text-2xl md:text-3xl text-warningOrange tracking-widest mb-6">τ_gyro = I * Ω_rotor × Ω_tilt</h3>
+              <p class="text-slate-400 text-sm md:text-base max-w-2xl mx-auto font-light leading-relaxed">
+                  The torque is proportional to the rotational inertia of the blades (I), the spinning speed of the rotor (Ω_rotor), and how fast you try to tilt the nacelle (Ω_tilt).
+              </p>
+          </div>
+
+          <h3 class="text-2xl font-bold text-techGreen mb-4">The Dual Coaxial-Duct Solution</h3>
+          <p class="text-lg text-slate-300 leading-relaxed mb-4 font-light">
+              To safely tilt the rotors without snapping the wings, our drone uses a clever mechanical trick. By mounting <strong class="text-white font-medium">two</strong> counter-rotating props (one spinning Clockwise, one spinning Counter-Clockwise) inside each duct, we create two equal but opposite gyroscopic torques during transition.
+          </p>
+          <p class="text-lg text-slate-300 leading-relaxed mb-4 font-light">
+              As the nacelle tilts forward, the top rotor tries to twist the wing UP, while the bottom rotor tries to twist the wing DOWN. Because both rotors are mounted on the same reinforced titanium spar within the duct, these violent twisting forces fight each other and <strong class="text-techGreen font-medium text-glow-green">cancel out</strong>.
+          </p>
+          <p class="text-lg text-slate-300 leading-relaxed mb-4 font-light">
+              The result? The net torque transferred back to the delicate aircraft fuselage is exactly zero, allowing a smooth, rapid transition from hover to cruise.
+          </p>
+      </div>
+  </div>
+
+  <script>
+    // View toggle
+    window.viewMode = '3rd';
+    function toggleView() {
+      window.viewMode = window.viewMode === '3rd' ? '1st' : '3rd';
+      document.getElementById('view-btn').textContent = '👁 VIEW: ' + (window.viewMode === '3rd' ? '3RD PERSON' : '1ST PERSON');
+    }
+
+    // Speed buttons
+    document.querySelectorAll('.speed-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (window.state) window.state.speed = parseFloat(btn.dataset.speed);
+      });
+    });
+  </script>
+
+  <!-- Load Simulator Logic -->
+  <script src="stl.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

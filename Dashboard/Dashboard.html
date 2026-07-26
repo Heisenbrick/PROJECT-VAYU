@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flight Dashboard</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="lib/leaflet.css" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    deepBlue: '#0A1128',
+                    techGreen: '#00FF66',
+                    neonBlue: '#00E5FF',
+                    darkSlate: '#1E293B',
+                    warningOrange: '#FF9800',
+                    dangerRed: '#FF4F5E'
+                },
+                fontFamily: {
+                    sans: ['Space Grotesk', 'sans-serif'],
+                    mono: ['JetBrains Mono', 'monospace'],
+                }
+            }
+        }
+    }
+  </script>
+  
+  <style>
+    body { background-color: #0A1128; color: #F8FAFC; overflow: hidden; }
+    
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00FF66; }
+
+    .glass { background: rgba(10, 17, 40, 0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+    .glass-panel { background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); border-top: 1px solid rgba(255, 255, 255, 0.2); border-left: 1px solid rgba(255, 255, 255, 0.2); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); }
+    
+    .text-glow-green { text-shadow: 0 0 15px rgba(0, 255, 102, 0.6); }
+    .text-glow-blue { text-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
+    .box-glow:hover { box-shadow: 0 0 25px rgba(0, 255, 102, 0.2); }
+    .box-glow-blue:hover { box-shadow: 0 0 25px rgba(0, 229, 255, 0.3); }
+
+    /* Dynamic Dots & Status */
+    .indicator .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background-color: #64748b; }
+    .indicator .dot.green { background-color: #00FF66; box-shadow: 0 0 8px rgba(0,255,102,0.5); }
+    .indicator .dot.pulse-green { background-color: #00FF66; box-shadow: 0 0 8px #00FF66; animation: alarm-pulse 2s infinite ease-in-out; }
+    .indicator .dot.amber { background-color: #FF9800; box-shadow: 0 0 8px rgba(255,152,0,0.5); animation: alarm-pulse 1.5s infinite ease-in-out; }
+    .indicator .dot.red { background-color: #FF4F5E; box-shadow: 0 0 8px rgba(255,79,94,0.5); animation: alarm-pulse 0.8s infinite ease-in-out; }
+
+    @keyframes alarm-pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+
+    /* Panel States */
+    .panel.warning-state { border-color: #FF9800 !important; box-shadow: inset 0 0 15px rgba(255,152,0,0.1); }
+    .panel.alarm-state { border-color: #FF4F5E !important; animation: border-flash 1s infinite alternate; }
+    @keyframes border-flash { from { border-color: #FF4F5E; box-shadow: inset 0 0 15px rgba(255,79,94,0.2); } to { border-color: rgba(255,79,94,0.3); box-shadow: inset 0 0 5px rgba(255,79,94,0.1); } }
+
+    /* Timeline */
+    .mission-timeline { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; position: relative; padding-left: 14px; }
+    .mission-timeline::before { content: ''; position: absolute; left: 3px; top: 6px; bottom: 6px; width: 1px; background-color: rgba(255,255,255,0.1); }
+    .timeline-step { display: flex; align-items: flex-start; position: relative; }
+    .timeline-step .timeline-dot { position: absolute; left: -14px; top: 4px; width: 7px; height: 7px; border-radius: 50%; background-color: #0A1128; border: 1px solid rgba(255,255,255,0.2); }
+    .timeline-step.completed .timeline-dot { background-color: #00FF66; border-color: #00FF66; }
+    .timeline-step.active .timeline-dot { background-color: #00E5FF; border-color: #00E5FF; box-shadow: 0 0 6px #00E5FF; }
+    .timeline-step.upcoming .timeline-dot { background-color: #0A1128; border: 1px solid rgba(255,255,255,0.2); }
+
+    /* Module Status */
+    .module-status-item.green .status, .module-status-item.green .dot { color: #00FF66; background-color: #00FF66; }
+    .module-status-item.amber .status, .module-status-item.amber .dot { color: #FF9800; background-color: #FF9800; }
+    .module-status-item.red .status, .module-status-item.red .dot { color: #FF4F5E; background-color: #FF4F5E; }
+
+    /* Motor & Cell Status */
+    .motor-indicator .val.green { color: #00FF66; }
+    .motor-indicator .val.amber { color: #FF9800; }
+    .motor-indicator .val.red { color: #FF4F5E; }
+
+    .cell-block.green { border-color: rgba(0,255,102,0.3); color: #00FF66; background-color: rgba(0,255,102,0.05); }
+    .cell-block.amber { border-color: rgba(255,152,0,0.3); color: #FF9800; background-color: rgba(255,152,0,0.05); }
+    .cell-block.red { border-color: rgba(255,79,94,0.3); color: #FF4F5E; background-color: rgba(255,79,94,0.05); }
+    .cell-block { padding: 4px; text-align: center; font-size: 10px; border-radius: 2px; border: 1px solid transparent; font-family: 'JetBrains Mono', monospace; }
+
+    /* Leaflet overrides */
+    .leaflet-container { background: transparent !important; font-family: 'Space Grotesk', sans-serif !important; }
+    .leaflet-bar { border: 1px solid rgba(255,255,255,0.1) !important; box-shadow: none !important; }
+    .leaflet-bar a { background-color: rgba(10,17,40,0.8) !important; color: #F8FAFC !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; }
+    .leaflet-bar a:hover { background-color: rgba(0,229,255,0.2) !important; color: #00E5FF !important; }
+    .leaflet-control-attribution { background: rgba(0,0,0,0.5) !important; color: #64748b !important; font-size: 8px !important; }
+
+    /* Custom CSS for map containers etc */
+    #leaflet-map { width: 100%; height: 100%; border-radius: 0.25rem; }
+    #three-drone-container { width: 100%; height: 100%; }
+    #lidar-canvas { width: 100%; height: 100%; display: block; border-radius: 0.25rem; }
+
+    /* Compass & Wind Vector */
+    .compass-circle { position: relative; width: 60px; height: 60px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; background-color: rgba(255,255,255,0.02); }
+    .compass-arrow { position: absolute; top: 50%; left: 50%; width: 2px; height: 24px; background-color: #FF9800; transform-origin: 50% 50%; margin-top: -12px; margin-left: -1px; transition: transform 0.8s ease; }
+    .compass-arrow::after { content: ''; position: absolute; top: -4px; left: -2px; width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 5px solid #FF9800; }
+    .compass-labels { position: absolute; inset: 0; font-size: 8px; color: #64748b; font-family: 'JetBrains Mono', monospace; }
+    .compass-labels span { position: absolute; }
+    .lbl-n { top: 2px; left: 50%; transform: translateX(-50%); }
+    .lbl-e { right: 4px; top: 50%; transform: translateY(-50%); }
+    .lbl-s { bottom: 2px; left: 50%; transform: translateX(-50%); }
+    .lbl-w { left: 4px; top: 50%; transform: translateY(-50%); }
+
+    /* Console Outputs */
+    .console-input-line { display: flex; align-items: center; padding: 0 10px; background-color: rgba(0, 0, 0, 0.4); border-top: 1px solid rgba(255,255,255,0.1); height: 28px; }
+    .console-input-line input { flex: 1; background: transparent; border: none; outline: none; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #F8FAFC; }
+    .log-line { font-family: 'JetBrains Mono', monospace; font-size: 10px; word-break: break-all; margin-bottom: 4px; }
+    .log-line.system-line { color: #64748b; }
+    .log-line.info-line { color: #00E5FF; }
+    .log-line.success-line { color: #00FF66; }
+    .log-line.warning-line { color: #FF9800; }
+    .log-line.error-line { color: #FF4F5E; }
+
+    /* AFIP Console Overlay */
+    .afip-console-overlay { position: fixed; inset: 0; z-index: 100; background-color: rgba(10, 17, 40, 0.95); backdrop-filter: blur(10px); display: flex; flex-direction: column; }
+    .afip-console-overlay.hidden { display: none; }
+    .afip-console-header { height: 50px; display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid rgba(0,229,255,0.3); background-color: rgba(0,229,255,0.05); }
+    .afip-console-grid { flex: 1; padding: 12px; display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(150px, auto); gap: 12px; overflow-y: auto; }
+    .afip-panel-mount { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 8px; }
+    .afip-panel-mount-wide { grid-column: span 4; }
+
+  </style>
+  
+  <script src="lib/lucide.min.js"></script>
+  <script src="lib/three.min.js"></script>
+  <script src="lib/leaflet.js"></script>
+</head>
+<body class="antialiased bg-deepBlue text-slate-100 overflow-hidden h-screen w-screen selection:bg-techGreen selection:text-deepBlue">
+
+  <script>
+    (function() {
+      window.addEventListener('error', function(e) {
+        const logs = document.getElementById('console-logs');
+        if (!logs) return;
+        const line = document.createElement('div');
+        line.className = 'log-line error-line';
+        if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+          const url = e.target.src || e.target.href;
+          line.textContent = `[CRITICAL] FAILED TO LOAD SYSTEM SUBSYSTEM: ${url.split('/').pop()}`;
+        } else {
+          line.textContent = `[CRITICAL] RUNTIME: ${e.message} at ${e.filename ? e.filename.split('/').pop() : 'unknown'}:${e.lineno || 0}`;
+        }
+        logs.appendChild(line);
+        logs.scrollTop = logs.scrollHeight;
+      }, true);
+    })();
+  </script>
+
+  <div id="app-container" class="flex flex-col h-screen w-screen">
+    
+    <!-- HEADER -->
+        <!-- HEADER -->
+    <header class="system-header h-[60px] bg-black/40 border-b border-white/10 flex items-center px-6 shrink-0 z-50 glass">
+      <div class="w-full flex items-center justify-between">
+          
+          <!-- Left Column (Logo & Status) -->
+          <div class="flex-1 flex justify-start items-center gap-4">
+            <div class="logo-area font-mono font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-techGreen to-neonBlue text-glow-green uppercase md:text-lg text-sm">
+              <span class="logo-bracket text-slate-500">[</span>
+              <span class="logo-text">FLIGHT_INTEL_V5</span>
+              <span class="logo-bracket text-slate-500">]</span>
+            </div>
+            
+            <div class="header-divider w-px h-5 bg-white/20 hidden xl:block"></div>
+            <div class="drone-id-badge font-mono text-xs hidden xl:flex items-center gap-2">
+              <span class="label text-slate-400">UNIT:</span>
+              <span class="value text-neonBlue font-bold" id="drone-tail-number">ARES-V2 // TAIL-88</span>
+            </div>
+            
+            <div class="status-indicator-group hidden 2xl:flex gap-6 ml-4">
+              <div class="indicator flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase" id="ind-mode">
+                <span class="dot pulse-green"></span>
+                <span class="text text-slate-200">AI AUTONOMOUS</span>
+              </div>
+              <div class="indicator flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase" id="ind-gps">
+                <span class="dot green"></span>
+                <span class="text text-slate-200">RTK FIXED (31 SV)</span>
+              </div>
+              <div class="indicator flex items-center gap-2 font-mono text-[10px] tracking-wider uppercase" id="ind-comms">
+                <span class="dot green"></span>
+                <span class="text text-slate-200">SAT-LINK: 98ms</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Center Column (Navigation) -->
+          <div class="flex-none flex justify-center gap-4" id="nav-links">
+              <a href="../Landing_Page.html#" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Home</a>
+              <a href="../Simulator/Simulator.html" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Simulator</a>
+              <a href="#" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-neonBlue border border-neonBlue rounded bg-transparent hover:bg-neonBlue hover:text-deepBlue hover:border-neonBlue transition-all duration-300 box-glow-blue shadow-[0_0_15px_rgba(0,229,255,0.3)]">Dashboard</a>
+          </div>
+
+          <!-- Right Column (Telemetry/Console) -->
+          <div class="flex-1 flex justify-end items-center text-right gap-4 md:gap-6">
+            <div class="telemetry-compact hidden md:flex gap-4 md:gap-6">
+              <div class="metric flex flex-col items-end">
+                <span class="lbl text-[9px] text-slate-400 tracking-wider">SYS TIME (UTC)</span>
+                <span class="val font-mono text-xs font-semibold text-white" id="time-utc">19:42:05</span>
+              </div>
+              <div class="metric flex flex-col items-end">
+                <span class="lbl text-[9px] text-slate-400 tracking-wider">MISSION TIME</span>
+                <span class="val font-mono text-xs font-semibold text-white" id="mission-elapsed">00:34:12</span>
+              </div>
+            </div>
+            <button class="btn btn-afip-console px-4 py-1.5 flex items-center gap-2 text-[10px] font-mono tracking-wider border border-neonBlue text-neonBlue rounded bg-neonBlue/10 hover:bg-neonBlue hover:text-deepBlue transition-all box-glow-blue uppercase" id="btn-open-afip-console">
+              <i data-lucide="layers" class="w-3 h-3"></i> <span class="hidden sm:inline">AFIP REASONING CONSOLE</span><span class="sm:hidden">AFIP</span>
+            </button>
+          </div>
+          
+      </div>
+    </header>
+
+    <!-- DASHBOARD GRID -->
+    <main class="dashboard-grid flex-1 grid grid-cols-1 lg:grid-cols-[340px_1fr_340px] xl:grid-cols-[380px_1fr_380px] gap-3 p-3 overflow-hidden bg-deepBlue">
+      
+      <!-- LEFT COLUMN -->
+      <section class="grid-column col-left flex flex-col gap-3 h-full overflow-hidden">
+        
+        <!-- Mission Info Panel -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col shrink-0 transition-all duration-200" id="panel-mission-state">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="navigation" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">FLIGHT STATUS & MISSION</h2>
+            </div>
+            <span class="panel-tag status-nominal font-mono text-[9px] px-1.5 py-0.5 rounded font-bold tracking-widest bg-techGreen/10 text-techGreen border border-techGreen/20">EN ROUTE</span>
+          </div>
+          <div class="panel-body p-3 flex flex-col gap-3">
+            <div class="flight-metrics-grid grid grid-cols-2 gap-2">
+              <div class="metric-box bg-white/5 border border-white/5 p-2 rounded flex flex-col">
+                <span class="metric-label text-[9px] text-slate-400 mb-1 uppercase tracking-wider">GROUND SPEED</span>
+                <span class="metric-value font-mono text-lg font-bold text-white" id="val-speed">48.2 <span class="unit text-[10px] font-normal text-slate-400">kt</span></span>
+              </div>
+              <div class="metric-box bg-white/5 border border-white/5 p-2 rounded flex flex-col">
+                <span class="metric-label text-[9px] text-slate-400 mb-1 uppercase tracking-wider">ALTITUDE (AGL)</span>
+                <span class="metric-value font-mono text-lg font-bold text-white" id="val-alt">328 <span class="unit text-[10px] font-normal text-slate-400">ft</span></span>
+              </div>
+              <div class="metric-box bg-white/5 border border-white/5 p-2 rounded flex flex-col">
+                <span class="metric-label text-[9px] text-slate-400 mb-1 uppercase tracking-wider">VERTICAL SPEED</span>
+                <span class="metric-value font-mono text-lg font-bold text-white" id="val-vspeed">+0.5 <span class="unit text-[10px] font-normal text-slate-400">m/s</span></span>
+              </div>
+              <div class="metric-box bg-white/5 border border-white/5 p-2 rounded flex flex-col">
+                <span class="metric-label text-[9px] text-slate-400 mb-1 uppercase tracking-wider">PITCH / ROLL</span>
+                <span class="metric-value font-mono text-lg font-bold text-white" id="val-attitude">1.5° / -2.1°</span>
+              </div>
+            </div>
+            
+            <div class="progress-bar-container mt-1">
+              <div class="progress-labels flex justify-between text-[9px] text-slate-400 mb-1 font-mono uppercase">
+                <span>WP-03 (SECTOR 4)</span>
+                <span id="mission-pct-label" class="text-white">74%</span>
+                <span>WP-04 (TERMINAL)</span>
+              </div>
+              <div class="progress-track h-1 bg-white/10 rounded-full overflow-hidden">
+                <div class="progress-fill h-full bg-techGreen rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(0,255,102,0.5)]" id="mission-progress-bar" style="width: 74%;"></div>
+              </div>
+            </div>
+
+            <div class="mission-timeline">
+              <div class="timeline-step completed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content flex gap-3 font-mono text-[10px]">
+                  <span class="time text-slate-400 w-10 shrink-0">00:00</span>
+                  <span class="desc text-white">Takeoff: Base Alpha</span>
+                </div>
+              </div>
+              <div class="timeline-step completed">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content flex gap-3 font-mono text-[10px]">
+                  <span class="time text-slate-400 w-10 shrink-0">00:12</span>
+                  <span class="desc text-white">WP1: Altitude lock @ 350ft</span>
+                </div>
+              </div>
+              <div class="timeline-step active">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content flex gap-3 font-mono text-[10px]">
+                  <span class="time text-neonBlue w-10 shrink-0">00:26</span>
+                  <span class="desc text-white">WP2 -> WP3: Transit Sector 4</span>
+                </div>
+              </div>
+              <div class="timeline-step upcoming">
+                <div class="timeline-dot"></div>
+                <div class="timeline-content flex gap-3 font-mono text-[10px]">
+                  <span class="time text-slate-500 w-12 shrink-0">ETA 00:46</span>
+                  <span class="desc text-slate-500">WP4: Cargo Drop</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- System AI Status & Explainability -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col flex-1 min-h-0 transition-all duration-200" id="panel-ai-explain">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="cpu" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">AI EXPLAINABILITY & WORLD MODEL</h2>
+            </div>
+            <div class="confidence-badge font-mono text-[9px] flex gap-1 bg-black/30 px-1.5 py-0.5 rounded border border-white/5">
+              <span class="lbl text-slate-400">CONF:</span>
+              <span class="val text-techGreen font-bold" id="val-confidence">98.4%</span>
+            </div>
+          </div>
+          <div class="panel-body p-3 overflow-y-auto flex flex-col gap-3">
+            <div class="explainability-box bg-white/5 border border-white/10 rounded p-3">
+              <div class="explain-header flex justify-between border-b border-dashed border-white/20 pb-1 mb-2 font-mono text-[9px] text-slate-400">
+                <span class="explain-label uppercase tracking-wider text-neonBlue">ACTIVE OBJECTIVE BEHAVIOR</span>
+                <span class="explain-timestamp" id="explain-time">19:42:01</span>
+              </div>
+              <p class="explain-text text-[11px] leading-relaxed text-slate-200" id="explain-message">
+                Maintaining standard trajectory corridor. Correcting roll matrix for 12kt crosswind from 280° (bearing West). Altitude compensation set to +2.4% throttle output to account for localized thermals. Obstacle scan returns safe margins within 300m cylinder.
+              </p>
+            </div>
+
+            <div class="modules-status-grid grid grid-cols-2 gap-2 mt-auto">
+              <div class="module-status-item green bg-white/5 border border-white/10 p-2 rounded flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider" id="mod-fusion">
+                <span class="dot w-1.5 h-1.5 rounded-full"></span>
+                <span class="name text-slate-300">HEALTH_MONITOR</span>
+                <span class="status ml-auto font-bold">OK</span>
+              </div>
+              <div class="module-status-item green bg-white/5 border border-white/10 p-2 rounded flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider" id="mod-nav">
+                <span class="dot w-1.5 h-1.5 rounded-full"></span>
+                <span class="name text-slate-300">RISK_ENGINE</span>
+                <span class="status ml-auto font-bold">OK</span>
+              </div>
+              <div class="module-status-item green bg-white/5 border border-white/10 p-2 rounded flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider" id="mod-control">
+                <span class="dot w-1.5 h-1.5 rounded-full"></span>
+                <span class="name text-slate-300">MISSION_EXEC</span>
+                <span class="status ml-auto font-bold">OK</span>
+              </div>
+              <div class="module-status-item green bg-white/5 border border-white/10 p-2 rounded flex items-center gap-2 font-mono text-[9px] uppercase tracking-wider" id="mod-perception">
+                <span class="dot w-1.5 h-1.5 rounded-full"></span>
+                <span class="name text-slate-300">DECISION_ENGINE</span>
+                <span class="status ml-auto font-bold">OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Environment Panel -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col shrink-0 transition-all duration-200" id="panel-environment">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="cloud-sun" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">ENVIRONMENT & METAR</h2>
+            </div>
+          </div>
+          <div class="panel-body p-3 flex flex-col gap-2">
+            <div class="env-metrics-grid grid grid-cols-2 gap-2">
+              <div class="env-metric-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="label text-[8px] text-slate-400 uppercase tracking-wider mb-1">CROSSWIND</span>
+                <span class="value font-mono text-xs font-bold text-white" id="val-wind">12.4 <span class="unit text-[9px] font-normal text-slate-400">kts / 280°</span></span>
+              </div>
+              <div class="env-metric-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="label text-[8px] text-slate-400 uppercase tracking-wider mb-1">TEMPERATURE</span>
+                <span class="value font-mono text-xs font-bold text-white" id="val-temp">16.8°C <span class="unit text-[9px] font-normal text-slate-400">(ISA +2.4°)</span></span>
+              </div>
+              <div class="env-metric-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="label text-[8px] text-slate-400 uppercase tracking-wider mb-1">AIR DENSITY</span>
+                <span class="value font-mono text-xs font-bold text-white">1.189 <span class="unit text-[9px] font-normal text-slate-400">kg/m³</span></span>
+              </div>
+              <div class="env-metric-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="label text-[8px] text-slate-400 uppercase tracking-wider mb-1">PRECIPITATION</span>
+                <span class="value font-mono text-xs font-bold text-white" id="val-precip">0.0 <span class="unit text-[9px] font-normal text-slate-400">mm/hr</span></span>
+              </div>
+            </div>
+            <div class="wind-vector-widget flex items-center gap-3 bg-white/5 border border-white/10 rounded p-2 mt-1">
+              <div class="compass-circle">
+                <div class="compass-arrow" id="wind-arrow" style="transform: rotate(280deg);"></div>
+                <div class="compass-labels">
+                  <span class="lbl-n">N</span><span class="lbl-e">E</span><span class="lbl-s">S</span><span class="lbl-w">W</span>
+                </div>
+              </div>
+              <div class="wind-vector-meta flex-1">
+                <span class="title block text-[9px] font-bold text-neonBlue mb-1 uppercase tracking-widest">WIND DIRECTION ANALYSIS</span>
+                <p class="text-[9px] leading-tight text-slate-400">Drone trajectory oriented at 45° (NE). Wind is hitting drone portside-rear flank. Autopilot compensating by applying +1.2° pitch and counter-yaw torque.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CENTER COLUMN -->
+      <section class="grid-column col-center flex flex-col gap-3 h-full overflow-hidden">
+        
+        <!-- Live Map Card -->
+        <div class="panel map-card glass-panel rounded-lg flex flex-col flex-1 min-h-0 transition-all duration-200" id="panel-live-map">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center z-10 relative">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="map" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">TACTICAL LIVE MAP</h2>
+            </div>
+            <div class="map-controls-compact flex gap-2">
+              <button class="map-btn active px-2 py-0.5 text-[9px] font-mono tracking-wider border border-neonBlue bg-neonBlue/10 text-neonBlue rounded hover:bg-neonBlue hover:text-deepBlue transition-colors" id="btn-toggle-radar">RADAR</button>
+              <button class="map-btn px-2 py-0.5 text-[9px] font-mono tracking-wider border border-white/20 bg-transparent text-slate-400 rounded hover:text-white transition-colors" id="btn-toggle-geofence">GEOFENCE</button>
+            </div>
+          </div>
+          <div class="panel-body map-container-wrapper p-0 relative flex-1">
+            <div id="leaflet-map"></div>
+          </div>
+        </div>
+
+        <!-- Lower Center Split -->
+        <div class="center-bottom-split grid grid-cols-2 gap-3 h-64 shrink-0">
+          
+          <!-- World Model -->
+          <div class="panel lidar-card glass-panel rounded-lg flex flex-col overflow-hidden transition-all duration-200" id="panel-world-model">
+            <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center relative z-10">
+              <div class="panel-title-group flex items-center gap-2">
+                <i data-lucide="view" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+                <h2 class="text-[9px] font-semibold tracking-widest text-white uppercase truncate">WORLD MODEL LIDAR SCAN</h2>
+              </div>
+              <span class="panel-tag tracking font-mono text-[8px] px-1.5 py-0.5 bg-neonBlue/10 text-neonBlue border border-neonBlue/20 rounded font-bold tracking-widest whitespace-nowrap">SWEEP ACTIVE</span>
+            </div>
+            <div class="panel-body lidar-container-wrapper p-0 relative flex-1 bg-[#080a0d]">
+              <canvas id="lidar-canvas"></canvas>
+              <div class="lidar-legend absolute bottom-2 left-2 flex flex-col gap-1 bg-black/80 border border-white/10 p-1.5 rounded font-mono text-[8px]">
+                <span class="legend-item flex items-center gap-1.5 text-slate-400"><span class="color-dot yellow"></span> Safe Corridor</span>
+                <span class="legend-item flex items-center gap-1.5 text-slate-400"><span class="color-dot red"></span> Obstacle/Terrain</span>
+                <span class="legend-item flex items-center gap-1.5 text-slate-400"><span class="color-dot teal bg-neonBlue"></span> Flight Path</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Console -->
+          <div class="panel console-card glass-panel rounded-lg flex flex-col overflow-hidden transition-all duration-200" id="panel-operator-console">
+            <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center relative z-10">
+              <div class="panel-title-group flex items-center gap-2">
+                <i data-lucide="terminal" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+                <h2 class="text-[9px] font-semibold tracking-widest text-white uppercase truncate">TACTICAL CONSOLE</h2>
+              </div>
+              <span class="terminal-status font-mono text-[8px] text-techGreen tracking-widest whitespace-nowrap">ONLINE / SECURE</span>
+            </div>
+            <div class="panel-body console-body p-0 flex flex-col flex-1 bg-[#07090c]">
+              <div class="console-log-output flex-1 p-2 overflow-y-auto" id="console-logs">
+                <div class="log-line system-line">[19:08:12] INITIALIZING ARES-V2 FLIGHT SUBSYSTEMS...</div>
+                <div class="log-line success-line">[19:08:14] RTK POSITION FIXED: 37.7749° N, 122.4194° W</div>
+                <div class="log-line system-line">[19:08:15] ENABLING COLLISION AVOIDANCE MATRIX V4</div>
+                <div class="log-line info-line">[19:08:18] SECURE LINK ESTABLISHED VIA STARLINK SECTOR 18</div>
+                <div class="log-line success-line">[19:08:20] PAYLOAD STATUS: 1200kg SECURED - HYDRAULIC PRESSURE NOMINAL</div>
+                <div class="log-line system-line">[19:08:22] FLIGHT STATE CHANGED: RUNWAY_TAKEOFF</div>
+                <div class="log-line success-line">[19:08:35] DEPARTED BASE ALPHA. CLIMBING TO WAYPOINT 1</div>
+                <div class="log-line info-line">[19:12:00] AUTOPILOT REACHED WP1 (350ft). ROTOR DYNAMICS NOMINAL.</div>
+                <div class="log-line info-line">[19:26:00] TRANSIT TO WP2 COMPLETED. CURRENT HEADING 45° NE.</div>
+                <div class="log-line system-line">[19:42:00] TRANSIT CORRIDOR ADJUSTED (+2.4m NORTH) TO BYPASS THERMAL ANOMALY.</div>
+              </div>
+              <div class="console-input-line">
+                <span class="prompt text-neonBlue">ares_v2_cmd::></span>
+                <input type="text" id="console-input" placeholder="Type command..." autocomplete="off" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN -->
+      <section class="grid-column col-right flex flex-col gap-3 h-full overflow-hidden">
+        
+        <!-- 3D Drone -->
+        <div class="panel drone-3d-card glass-panel rounded-lg flex flex-col h-64 shrink-0 transition-all duration-200" id="panel-drone-3d">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center relative z-10">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="box" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">3D TELEMETRY & ATTITUDE</h2>
+            </div>
+            <div class="attitude-indicators flex gap-2 font-mono text-[9px] text-slate-400">
+              <div class="att-indicator">P: <span id="val-pitch" class="text-white font-bold">1.5°</span></div>
+              <div class="att-indicator">R: <span id="val-roll" class="text-white font-bold">-2.1°</span></div>
+              <div class="att-indicator">Y: <span id="val-yaw" class="text-white font-bold">45.0°</span></div>
+            </div>
+          </div>
+          <div class="panel-body drone-3d-container-wrapper p-0 relative flex-1 bg-[#0c0f13]">
+            <div id="three-drone-container"></div>
+            
+            <div class="overlay-3d-instructions absolute top-2 left-2 font-mono text-[8px] text-slate-400 pointer-events-none">
+              <span>DRAG TO ROTATE // SCROLL TO ZOOM</span>
+            </div>
+
+            <div class="motor-grid-overlay absolute bottom-2 left-2 right-2 grid grid-cols-4 gap-1 pointer-events-none">
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-1"><span class="lbl text-slate-400 mb-0.5">M1</span><span class="val green">95%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-2"><span class="lbl text-slate-400 mb-0.5">M2</span><span class="val green">94%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-3"><span class="lbl text-slate-400 mb-0.5">M3</span><span class="val green">96%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-4"><span class="lbl text-slate-400 mb-0.5">M4</span><span class="val green">95%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-5"><span class="lbl text-slate-400 mb-0.5">M5</span><span class="val green">95%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-6"><span class="lbl text-slate-400 mb-0.5">M6</span><span class="val green">96%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-7"><span class="lbl text-slate-400 mb-0.5">M7</span><span class="val green">94%</span></div>
+              <div class="motor-indicator bg-black/70 border border-white/10 p-1 rounded flex flex-col items-center font-mono text-[8px]" id="motor-8"><span class="lbl text-slate-400 mb-0.5">M8</span><span class="val green">95%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Battery -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col shrink-0 transition-all duration-200" id="panel-power-grid">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="zap" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">POWER MATRIX & BMS</h2>
+            </div>
+            <span class="panel-tag status-nominal font-mono text-[9px] px-1.5 py-0.5 bg-techGreen/10 text-techGreen border border-techGreen/20 rounded font-bold tracking-widest" id="bms-main-tag">82.4V NOMINAL</span>
+          </div>
+          <div class="panel-body p-3 flex flex-col gap-3">
+            <div class="power-summary flex gap-4 items-center">
+              <div class="battery-visual flex flex-col items-center gap-1">
+                <div class="battery-shell w-14 h-6 border-2 border-white/20 rounded relative flex items-center p-[1px]">
+                  <div class="battery-tip absolute -right-[3px] top-[4px] bottom-[4px] w-[2px] bg-white/20 rounded-r"></div>
+                  <div class="battery-fluid h-full bg-techGreen rounded-sm transition-all duration-300 shadow-[0_0_8px_rgba(0,255,102,0.4)]" id="battery-fluid-level" style="width: 68%;"></div>
+                </div>
+                <span class="pct font-mono text-xs font-bold text-techGreen" id="val-battery-pct">68%</span>
+              </div>
+              <div class="power-rates flex gap-4 flex-1 justify-around">
+                <div class="rate-item flex flex-col">
+                  <span class="lbl text-[9px] text-slate-400 uppercase tracking-wider mb-1">CURRENT DRAW</span>
+                  <span class="val font-mono text-sm font-bold text-white" id="val-power-draw">165.2 <span class="unit text-[9px] font-normal text-slate-400">A</span></span>
+                </div>
+                <div class="rate-item flex flex-col">
+                  <span class="lbl text-[9px] text-slate-400 uppercase tracking-wider mb-1">REMAINING LIFE</span>
+                  <span class="val font-mono text-sm font-bold text-white" id="val-power-remaining">18.4 <span class="unit text-[9px] font-normal text-slate-400">min</span></span>
+                </div>
+              </div>
+            </div>
+            <div class="cell-matrix-title font-mono text-[9px] text-slate-400 border-b border-dashed border-white/20 pb-1 uppercase">BMS CELL TEMPERATURES (°C)</div>
+            <div class="cell-grid grid grid-cols-4 gap-1">
+              <div class="cell-block green">C1: 34.2</div><div class="cell-block green">C2: 34.5</div><div class="cell-block green">C3: 33.8</div><div class="cell-block green">C4: 34.1</div>
+              <div class="cell-block green">C5: 35.0</div><div class="cell-block green">C6: 34.6</div><div class="cell-block green">C7: 34.2</div><div class="cell-block green">C8: 34.4</div>
+              <div class="cell-block green">C9: 33.9</div><div class="cell-block green">C10: 34.0</div><div class="cell-block green">C11: 34.5</div><div class="cell-block green">C12: 34.2</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cargo -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col shrink-0 transition-all duration-200" id="panel-cargo">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="package" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">CARGO BAY & HYDRAULICS</h2>
+            </div>
+          </div>
+          <div class="panel-body p-3 flex flex-col gap-3">
+            <div class="cargo-grid grid grid-cols-2 gap-2">
+              <div class="cargo-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="lbl text-[8px] text-slate-400 uppercase tracking-wider mb-1">PAYLOAD WEIGHT</span>
+                <span class="val font-mono text-xs font-bold text-white">1,200 kg <span class="unit text-[9px] font-normal text-slate-400">/ 1,500 Max</span></span>
+              </div>
+              <div class="cargo-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="lbl text-[8px] text-slate-400 uppercase tracking-wider mb-1">CLAMPING FORCES</span>
+                <span class="val green font-mono text-xs font-bold" id="val-clamping">100% SECURE</span>
+              </div>
+              <div class="cargo-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="lbl text-[8px] text-slate-400 uppercase tracking-wider mb-1">CENTER OF GRAVITY</span>
+                <span class="val font-mono text-xs font-bold text-white">X: +0.02m / Y: -0.01m</span>
+              </div>
+              <div class="cargo-item bg-white/5 border border-white/10 p-2 rounded flex flex-col">
+                <span class="lbl text-[8px] text-slate-400 uppercase tracking-wider mb-1">HYDRAULIC PRESSURE</span>
+                <span class="val font-mono text-xs font-bold text-white">3,120 psi <span class="unit text-[9px] font-normal text-slate-400">(NOMINAL)</span></span>
+              </div>
+            </div>
+            
+            <div class="cargo-visual-bracket mt-1">
+              <div class="cargo-visual-box text-[9px] font-mono tracking-widest text-techGreen bg-techGreen/5 border-techGreen/30">
+                <span class="text">CARGO CONTAINER IN-CLAMP</span>
+                <div class="sensor-beams"><span class="beam laser-left"></span><span class="beam laser-right"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision History -->
+        <div class="panel telemetry-card glass-panel rounded-lg flex flex-col flex-1 min-h-0 transition-all duration-200" id="panel-decision-history">
+          <div class="panel-header h-9 bg-white/5 border-b border-white/10 px-3 flex justify-between items-center relative z-10">
+            <div class="panel-title-group flex items-center gap-2">
+              <i data-lucide="history" class="panel-icon w-3.5 h-3.5 text-slate-400"></i>
+              <h2 class="text-[10px] font-semibold tracking-widest text-white uppercase">DECISION HISTORY LOG</h2>
+            </div>
+          </div>
+          <div class="panel-body decision-history-body p-0 overflow-y-auto">
+            <table class="decision-table w-full text-left border-collapse text-[9px] font-mono relative">
+              <thead class="sticky top-0 bg-black/60 backdrop-blur border-b border-white/10 text-slate-400 uppercase">
+                <tr>
+                  <th class="p-2 font-normal">TIME</th>
+                  <th class="p-2 font-normal">DECISION CODE</th>
+                  <th class="p-2 font-normal">REASONING</th>
+                  <th class="p-2 font-normal text-right">RESULT</th>
+                </tr>
+              </thead>
+              <tbody id="decision-history-rows" class="text-slate-200">
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td class="p-2">19:08</td>
+                  <td class="code text-neonBlue p-2">TAKEOFF_INIT</td>
+                  <td class="p-2">Launch sequence verification successful.</td>
+                  <td class="p-2 text-right"><span class="badge badge-success bg-techGreen/10 text-techGreen border border-techGreen/20 px-1 py-0.5 rounded">OK</span></td>
+                </tr>
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td class="p-2">19:12</td>
+                  <td class="code text-neonBlue p-2">ALTITUDE_HOLD</td>
+                  <td class="p-2">Target 350ft AGL attained. Adjusting rotor trim.</td>
+                  <td class="p-2 text-right"><span class="badge badge-success bg-techGreen/10 text-techGreen border border-techGreen/20 px-1 py-0.5 rounded">OK</span></td>
+                </tr>
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td class="p-2">19:25</td>
+                  <td class="code text-neonBlue p-2">CROSSWIND_COMP</td>
+                  <td class="p-2">Wind speed > 10kt detected. Triggered lateral yaw trim.</td>
+                  <td class="p-2 text-right"><span class="badge badge-success bg-techGreen/10 text-techGreen border border-techGreen/20 px-1 py-0.5 rounded">ACTIVE</span></td>
+                </tr>
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td class="p-2">19:38</td>
+                  <td class="code text-neonBlue p-2">ROUTE_OFF_2.4M</td>
+                  <td class="p-2">Bypassing rising thermals to protect cargo thermal envelope.</td>
+                  <td class="p-2 text-right"><span class="badge badge-success bg-techGreen/10 text-techGreen border border-techGreen/20 px-1 py-0.5 rounded">OK</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- AFIP Overlay -->
+    <div id="afip-console-overlay" class="afip-console-overlay hidden">
+      <div class="afip-console-header">
+        <div class="panel-title-group flex items-center gap-2">
+          <i data-lucide="layers" class="panel-icon w-4 h-4 text-neonBlue"></i>
+          <h2 class="text-xs font-bold tracking-widest text-white uppercase">AFIP OPERATOR CONTROL STATION</h2>
+        </div>
+        <button class="btn border border-white/20 px-3 py-1 text-[10px] font-mono text-slate-300 rounded hover:bg-white/10 hover:text-white flex items-center gap-2 transition-colors" id="btn-close-afip-console"><i data-lucide="x" class="w-3 h-3"></i> CLOSE</button>
+      </div>
+      <div class="afip-console-grid">
+        <div class="afip-panel-mount" id="afip-panel-health"></div>
+        <div class="afip-panel-mount" id="afip-panel-prediction"></div>
+        <div class="afip-panel-mount" id="afip-panel-risk"></div>
+        <div class="afip-panel-mount" id="afip-panel-mission-planner"></div>
+        <div class="afip-panel-mount" id="afip-panel-navigation"></div>
+        <div class="afip-panel-mount" id="afip-panel-mission-executive"></div>
+        <div class="afip-panel-mount" id="afip-panel-decision"></div>
+        <div class="afip-panel-mount" id="afip-panel-explainability"></div>
+        <div class="afip-panel-mount" id="afip-panel-operator"></div>
+        <div class="afip-panel-mount afip-panel-mount-wide" id="afip-panel-timeline"></div>
+      </div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div id="global-alert-banner" class="hidden absolute top-[70px] left-1/2 -translate-x-1/2 z-[100] w-11/12 max-w-2xl bg-dangerRed/20 border border-dangerRed backdrop-blur-md p-3 rounded-lg shadow-[0_0_30px_rgba(255,79,94,0.3)]">
+      <div class="alert-content flex items-center gap-4">
+        <i data-lucide="alert-triangle" class="alert-icon w-6 h-6 text-dangerRed animate-pulse"></i>
+        <div class="alert-message flex flex-col">
+          <span class="title font-bold text-dangerRed text-sm tracking-wider uppercase">CRITICAL SYSTEM WARNING</span>
+          <span class="desc font-mono text-[11px] text-white" id="alert-banner-text">Sensor fault detected. Checking safety parameters.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Emergency Footer -->
+    <footer class="emergency-bar h-[55px] bg-black/80 border-t border-dangerRed/30 flex items-center justify-between px-6 shrink-0 z-50 backdrop-blur-md">
+      <div class="emergency-title font-mono font-bold text-[11px] text-dangerRed tracking-widest uppercase animate-pulse">EMERGENCY SYSTEM OVERRIDE</div>
+      <div class="action-buttons flex gap-3">
+        <button class="btn btn-warning px-3 py-2 flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase border border-warningOrange text-warningOrange bg-warningOrange/10 rounded hover:bg-warningOrange hover:text-deepBlue transition-colors box-glow" id="btn-rtl"><i data-lucide="home" class="w-3 h-3"></i> RETURN TO LAUNCH (RTL)</button>
+        <button class="btn btn-warning px-3 py-2 flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase border border-warningOrange text-warningOrange bg-warningOrange/10 rounded hover:bg-warningOrange hover:text-deepBlue transition-colors box-glow" id="btn-loiter"><i data-lucide="anchor" class="w-3 h-3"></i> LOITER / HOVER</button>
+        <button class="btn btn-danger px-3 py-2 flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase border border-dangerRed text-dangerRed bg-dangerRed/10 rounded hover:bg-dangerRed hover:text-white transition-colors shadow-[0_0_10px_rgba(255,79,94,0.3)]" id="btn-land"><i data-lucide="arrow-down-to-line" class="w-3 h-3"></i> IMMEDIATE LAND</button>
+        <button class="btn btn-danger px-3 py-2 flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase border border-dangerRed text-white bg-dangerRed hover:bg-red-700 transition-colors shadow-[0_0_15px_rgba(255,79,94,0.6)]" id="btn-kill"><i data-lucide="skull" class="w-3 h-3"></i> MOTOR KILL SWITCH</button>
+        <button class="btn btn-override px-3 py-2 flex items-center gap-2 text-[9px] font-mono font-bold tracking-widest uppercase border border-slate-500 text-slate-300 bg-slate-800 rounded hover:bg-slate-700 hover:text-white transition-colors ml-4" id="btn-override"><i data-lucide="shield-alert" class="w-3 h-3"></i> REQUEST OPERATOR OVERRIDE</button>
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="afip/afip-core.js"></script>
+  <script src="afip/evidence-adapter.js"></script>
+  <script src="afip/world-state.js"></script>
+  <script src="afip/health-monitor.js"></script>
+  <script src="afip/prediction-engine.js"></script>
+  <script src="afip/risk-engine.js"></script>
+  <script src="afip/mission-planner.js"></script>
+  <script src="afip/navigation.js"></script>
+  <script src="afip/operator-commands.js"></script>
+  <script src="afip/mission-executive.js"></script>
+  <script src="afip/decision-engine.js"></script>
+  <script src="afip/explainability.js"></script>
+  <script src="afip/mission-timeline.js"></script>
+  <script src="afip/ui/ui-common.js"></script>
+  <script src="afip/ui/health-panel.js"></script>
+  <script src="afip/ui/prediction-panel.js"></script>
+  <script src="afip/ui/risk-panel.js"></script>
+  <script src="afip/ui/mission-planner-panel.js"></script>
+  <script src="afip/ui/navigation-panel.js"></script>
+  <script src="afip/ui/mission-panel.js"></script>
+  <script src="afip/ui/decision-console.js"></script>
+  <script src="afip/ui/explainability-panel.js"></script>
+  <script src="afip/ui/operator-console.js"></script>
+  <script src="afip/ui/timeline-panel.js"></script>
+
+  <script src="drone3d.js"></script>
+  <script src="worldmodel.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+  <script src="afip-bridge.js"></script>
+
+  <script>
+    (function () {
+      var overlay = document.getElementById('afip-console-overlay');
+      var openBtn = document.getElementById('btn-open-afip-console');
+      var closeBtn = document.getElementById('btn-close-afip-console');
+      if (openBtn) openBtn.addEventListener('click', function () {
+        overlay.classList.remove('hidden');
+        if (window.AFIPBridge) window.AFIPBridge.mountPanels();
+        if (window.lucide) lucide.createIcons();
+      });
+      if (closeBtn) closeBtn.addEventListener('click', function () {
+        overlay.classList.add('hidden');
+      });
+    })();
+  </script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

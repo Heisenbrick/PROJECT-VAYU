@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAYU - VTOL Cargo Drone</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind Configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        deepBlue: '#0A1128',
+                        techGreen: '#00FF66',
+                        neonBlue: '#00E5FF',
+                        darkSlate: '#1E293B'
+                    },
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    backgroundImage: {
+                        'grid-pattern': "url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23ffffff' fill-opacity='0.03' fill-rule='evenodd'/%3E%3C/svg%3E\")",
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom CSS -->
+    <style>
+        body {
+            background-color: #0A1128;
+            color: #F8FAFC;
+        }
+        
+        .glass {
+            background: rgba(30, 41, 59, 0.4);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .glass-panel {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-left: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .text-glow-green { text-shadow: 0 0 15px rgba(0, 255, 102, 0.6); }
+        .text-glow-blue { text-shadow: 0 0 15px rgba(0, 229, 255, 0.6); }
+        
+        .box-glow:hover { box-shadow: 0 0 25px rgba(0, 255, 102, 0.2); }
+        .box-glow-blue:hover { box-shadow: 0 0 25px rgba(0, 229, 255, 0.3); }
+        
+        /* Scroll Animations */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .stagger-1 { transition-delay: 100ms; }
+        .stagger-2 { transition-delay: 200ms; }
+        .stagger-3 { transition-delay: 300ms; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0A1128; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #00FF66; }
+    </style>
+</head>
+<body class="antialiased bg-grid-pattern relative selection:bg-techGreen selection:text-deepBlue">
+    
+    <!-- Ambient Background Glows -->
+    <div class="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-techGreen/10 rounded-full blur-[150px] pointer-events-none z-[-1]"></div>
+    <div class="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-neonBlue/10 rounded-full blur-[150px] pointer-events-none z-[-1]"></div>
+    <div class="fixed top-[40%] left-[50%] -translate-x-1/2 w-[800px] h-[400px] bg-techGreen/5 rounded-full blur-[150px] pointer-events-none z-[-1]"></div>
+
+    <!-- Header / Navbar -->
+        <!-- Header / Navbar -->
+    <header class="fixed w-full top-0 z-50 glass border-b border-white/5">
+        <div class="w-full flex items-center justify-between px-6 py-4">
+            
+            <!-- Left Column (Logo) -->
+            <div class="flex-1 flex justify-start items-center">
+                <div class="text-2xl font-bold tracking-widest uppercase text-transparent bg-clip-text bg-gradient-to-r from-techGreen to-neonBlue text-glow-green">
+                    Project VAYU
+                </div>
+            </div>
+            
+            <!-- Center Column (Navigation) -->
+            <div class="flex-none flex justify-center gap-4">
+                <a href="Landing_Page.html#" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-neonBlue border border-neonBlue rounded bg-transparent hover:bg-neonBlue hover:text-deepBlue hover:border-neonBlue transition-all duration-300 box-glow-blue shadow-[0_0_15px_rgba(0,229,255,0.3)]">Home</a>
+                <a href="Simulator/Simulator.html" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Simulator</a>
+                <a href="Dashboard/Dashboard.html" class="px-4 py-1.5 text-sm font-mono uppercase tracking-widest text-techGreen border border-techGreen/50 rounded bg-transparent hover:bg-techGreen hover:text-deepBlue hover:border-techGreen transition-all duration-300 box-glow shadow-none">Dashboard</a>
+            </div>
+
+            <!-- Right Column (Status/Info) -->
+            <div class="flex-1 flex justify-end items-center text-right">
+                <div class="hidden lg:flex text-sm text-slate-400 font-mono items-center space-x-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-techGreen animate-pulse"></span>
+                    <span>Prepared by: Team VAYU | Campus: S-VYASA</span>
+                </div>
+            </div>
+            
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="min-h-screen flex items-center justify-center pt-24 pb-12 px-6 relative overflow-hidden">
+        <div class="container mx-auto grid lg:grid-cols-2 gap-16 items-center relative z-10">
+            <div class="space-y-8 fade-in">
+                <div class="inline-block px-3 py-1 glass rounded-full border border-techGreen/30 text-techGreen font-mono text-sm uppercase tracking-wide">
+                    Project Initiative
+                </div>
+                <h1 class="text-5xl lg:text-7xl font-bold leading-[1.1]">
+                    Heavy-Lift <br>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-techGreen to-neonBlue">Autonomous</span><br>
+                    VTOL Cargo Drone
+                </h1>
+                <p class="text-xl text-slate-300 max-w-xl font-light">
+                    Delivery logistics for anything heavier than a small parcel is still stuck on the ground. VAYU is changing that.
+                </p>
+                <div class="pt-4 flex flex-col sm:flex-row gap-4 mt-6">
+                    <a href="#divide" class="inline-flex justify-center items-center gap-3 px-8 py-4 bg-techGreen/10 border border-techGreen/50 text-techGreen font-mono hover:bg-techGreen hover:text-deepBlue transition-all duration-300 rounded box-glow uppercase tracking-wide group">
+                        Explore the Engineering
+                        <svg class="w-5 h-5 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    </a>
+                    <a href="Simulator/Simulator.html" class="inline-flex justify-center items-center gap-3 px-8 py-4 bg-transparent border border-cyan-400 text-cyan-400 font-mono hover:bg-cyan-400 hover:text-slate-900 hover:shadow-[0_0_15px_rgba(0,229,255,0.6)] transition-all duration-300 rounded uppercase tracking-wide group">
+                        SIMULATOR
+                        <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="relative fade-in stagger-2">
+                <div class="absolute inset-0 bg-gradient-to-tr from-techGreen/20 to-neonBlue/20 rounded-2xl blur-3xl transform scale-110"></div>
+                <div class="relative rounded-2xl border border-white/10 shadow-2xl glass-panel overflow-hidden group">
+                    <img src="https://images.unsplash.com/photo-1473968512647-3e447244af8f?auto=format&fit=crop&q=80&w=1200" alt="Aerospace Concept" class="w-full h-auto object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 mix-blend-luminosity hover:mix-blend-normal">
+                    <div class="absolute inset-0 bg-gradient-to-t from-deepBlue via-transparent to-transparent"></div>
+                </div>
+                
+                <!-- HUD Overlay Elements -->
+                <div class="absolute -bottom-6 -left-6 glass-panel p-5 rounded-lg font-mono text-sm text-techGreen z-20 shadow-[0_0_30px_rgba(0,255,102,0.15)]">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-2 h-2 bg-techGreen rounded-full animate-ping"></div>
+                        <span class="tracking-widest opacity-80">SYS_STATUS</span>
+                    </div>
+                    > CORE: ONLINE<br>
+                    > PROPULSION: STANDBY
+                </div>
+                
+                <div class="absolute top-1/4 -right-8 glass-panel p-3 rounded-lg font-mono text-xs text-neonBlue z-20 hidden md:block">
+                    [TILT: 90°]<br>
+                    [MODE: HOVER]
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- The Divide (Problem vs Solution) -->
+    <section id="divide" class="py-24 px-6 relative border-t border-white/5 bg-deepBlue/50">
+        <div class="container mx-auto">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-4">The Divide</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-red-500 to-techGreen mx-auto rounded-full"></div>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-8 lg:gap-12">
+                <!-- Problem Card -->
+                <div class="glass-panel p-10 rounded-2xl hover:-translate-y-2 transition-transform duration-500 fade-in stagger-1 relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-red-500/50 group-hover:bg-red-500 transition-colors duration-500"></div>
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-red-500/5 rounded-full blur-2xl group-hover:bg-red-500/10 transition-colors duration-500"></div>
+                    
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <h3 class="text-3xl font-bold text-slate-100">The Problem</h3>
+                    </div>
+                    
+                    <p class="text-slate-400 leading-relaxed text-lg font-light">
+                        <strong class="text-slate-200 font-medium">Delivery logistics for anything heavier than a small parcel is still stuck on the ground.</strong> Consumer drone delivery today tops out at a few kilograms — enough for a phone case, not a multi-item order or a full appliance. Everything above that weight still moves by truck, through traffic, on ground routes that don't scale with e-commerce demand from platforms like Amazon and Flipkart. There's an open gap between what trucks carry and what today's delivery drones can lift.
+                    </p>
+                </div>
+
+                <!-- Solution Card -->
+                <div class="glass-panel p-10 rounded-2xl hover:-translate-y-2 transition-transform duration-500 fade-in stagger-2 relative overflow-hidden group border-techGreen/20">
+                    <div class="absolute top-0 left-0 w-full h-1 bg-techGreen/50 group-hover:bg-techGreen transition-colors duration-500 box-glow"></div>
+                    <div class="absolute -right-10 -top-10 w-40 h-40 bg-techGreen/5 rounded-full blur-2xl group-hover:bg-techGreen/10 transition-colors duration-500"></div>
+                    
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 rounded-full bg-techGreen/10 flex items-center justify-center border border-techGreen/30 shadow-[0_0_15px_rgba(0,255,102,0.2)]">
+                            <svg class="w-6 h-6 text-techGreen" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        </div>
+                        <h3 class="text-3xl font-bold text-techGreen text-glow-green">The Solution</h3>
+                    </div>
+                    
+                    <p class="text-slate-400 leading-relaxed text-lg font-light">
+                        <strong class="text-slate-200 font-medium">Project VAYU is a VTOL cargo drone built around four ducted, counter-rotating tilt-fans mounted on a fixed wing spar.</strong> The same propulsion pods that lift it straight up rotate forward once airborne, trading vertical-lift efficiency for horizontal cruise efficiency — inside a 3×3 m footprint small enough for tight urban pads, carrying up to 80 kg. An onboard AI pilot runs the entire flight: takeoff, the tilt transition, cruise, obstacle avoidance, and landing. The operator's only input is a destination.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technical Specifications -->
+    <section class="py-24 px-6 relative">
+        <div class="container mx-auto">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-4">Technical Specifications</h2>
+                <div class="w-24 h-1 bg-neonBlue mx-auto rounded-full"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in stagger-1">
+                
+                <!-- Spec Item -->
+                <div class="glass p-6 rounded-xl border border-white/5 hover:border-techGreen/40 transition-colors group">
+                    <div class="text-techGreen mb-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    </div>
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Payload Capacity</div>
+                    <div class="text-3xl font-mono text-white flex items-baseline gap-1">
+                        <span class="counter-val" data-target="80">0</span>
+                        <span class="text-techGreen text-lg">kg</span>
+                    </div>
+                </div>
+
+                <!-- Spec Item -->
+                <div class="glass p-6 rounded-xl border border-white/5 hover:border-techGreen/40 transition-colors group">
+                    <div class="text-techGreen mb-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path></svg>
+                    </div>
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Max Takeoff Weight</div>
+                    <div class="text-3xl font-mono text-white flex items-baseline gap-1">
+                        ~<span class="counter-val" data-target="150">0</span>
+                        <span class="text-techGreen text-lg">kg</span>
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">(estimated)</div>
+                </div>
+
+                <!-- Spec Item -->
+                <div class="glass p-6 rounded-xl border border-white/5 hover:border-techGreen/40 transition-colors group">
+                    <div class="text-techGreen mb-3 opacity-80 group-hover:opacity-100 transition-opacity">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    </div>
+                    <div class="text-slate-400 text-sm uppercase tracking-wider mb-1">Footprint</div>
+                    <div class="text-3xl font-mono text-white flex items-baseline gap-2">
+                        <span class="counter-val" data-target="3.0">0.0</span>m <span class="text-techGreen text-lg">×</span> <span class="counter-val" data-target="3.0">0.0</span>m
+                    </div>
+                </div>
+
+                <!-- Spec Item -->
+                <div class="glass p-6 rounded-xl border border-white/5 hover:border-techGreen/40 transition-colors group lg:col-span-3 grid md:grid-cols-3 gap-6">
+                    <div>
+                        <div class="text-slate-400 text-sm uppercase tracking-wider mb-2">Propulsion</div>
+                        <div class="text-lg font-mono text-white">4× ducted, counter-rotating tilt-fans</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-400 text-sm uppercase tracking-wider mb-2">Flight Modes</div>
+                        <div class="text-lg font-mono text-techGreen">VTOL hover → <span class="text-white">autonomous transition</span> → horizontal cruise</div>
+                    </div>
+                    <div>
+                        <div class="text-slate-400 text-sm uppercase tracking-wider mb-2">Autonomy</div>
+                        <div class="text-lg font-mono text-white">After Destination input <span class="text-neonBlue">AI pilot handles full flight</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Engineering Challenges -->
+    <section class="py-24 px-6 relative bg-deepBlue/50 border-y border-white/5 overflow-hidden">
+        <!-- Abstract Background -->
+        <div class="absolute inset-0 opacity-20 bg-[url('https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1600')] bg-cover bg-center mix-blend-screen pointer-events-none"></div>
+        <div class="absolute inset-0 bg-deepBlue/80 backdrop-blur-sm pointer-events-none"></div>
+
+        <div class="container mx-auto relative z-10">
+            <div class="max-w-3xl mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-6">What Makes This Hard</h2>
+                <p class="text-xl text-slate-300 font-light border-l-4 border-neonBlue pl-6 py-2 bg-gradient-to-r from-neonBlue/10 to-transparent">
+                    "The interesting engineering problem here isn't lift — it's the transition."
+                </p>
+            </div>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Challenge 1 -->
+                <div class="glass-panel p-8 rounded-xl hover:bg-neonBlue/5 border border-white/5 hover:border-neonBlue/50 transition-all duration-300 group fade-in">
+                    <div class="text-neonBlue font-mono mb-4 text-sm tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">01 // MECHANICS</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-neonBlue transition-colors">Tilt Transition</h3>
+                    <p class="text-slate-400 font-light leading-relaxed">
+                        The ducts rotate 90°→0° while airborne; the AI has to keep the drone stable as lift shifts from rotor thrust to aerodynamic lift, with no human in the loop.
+                    </p>
+                </div>
+                <!-- Challenge 2 -->
+                <div class="glass-panel p-8 rounded-xl hover:bg-neonBlue/5 border border-white/5 hover:border-neonBlue/50 transition-all duration-300 group fade-in stagger-1">
+                    <div class="text-neonBlue font-mono mb-4 text-sm tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">02 // PHYSICS</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-neonBlue transition-colors">Counter-Rotating Torque Cancellation</h3>
+                    <p class="text-slate-400 font-light leading-relaxed">
+                        The left duct spins CW, the right spins CCW, so net yaw torque on the airframe stays near zero through the whole transition.
+                    </p>
+                </div>
+                <!-- Challenge 3 -->
+                <div class="glass-panel p-8 rounded-xl hover:bg-neonBlue/5 border border-white/5 hover:border-neonBlue/50 transition-all duration-300 group fade-in stagger-2">
+                    <div class="text-neonBlue font-mono mb-4 text-sm tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">03 // DESIGN</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-neonBlue transition-colors">Ducted Shrouding</h3>
+                    <p class="text-slate-400 font-light leading-relaxed">
+                        The fans sit inside ducts, cutting tip-vortex noise for flying over residential routes and adding thrust efficiency compared to an open propeller design.
+                    </p>
+                </div>
+                <!-- Challenge 4 -->
+                <div class="glass-panel p-8 rounded-xl hover:bg-neonBlue/5 border border-white/5 hover:border-neonBlue/50 transition-all duration-300 group fade-in stagger-3">
+                    <div class="text-neonBlue font-mono mb-4 text-sm tracking-widest opacity-70 group-hover:opacity-100 transition-opacity">04 // SOFTWARE</div>
+                    <h3 class="text-2xl font-bold mb-3 text-white group-hover:text-neonBlue transition-colors">Autonomous Path Planning</h3>
+                    <p class="text-slate-400 font-light leading-relaxed">
+                        Real-time obstacle- and wind-compensated routing, so a destination is the only thing needed to be inputted by operators.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Roadmap -->
+    <section class="py-24 px-6 relative">
+        <div class="container mx-auto">
+            <div class="text-center mb-16 fade-in">
+                <h2 class="text-4xl font-bold mb-4">Roadmap</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-techGreen to-neonBlue mx-auto rounded-full"></div>
+            </div>
+
+            <div class="max-w-4xl mx-auto space-y-12">
+                
+                <!-- Short Term -->
+                <div class="relative fade-in">
+                    <!-- Timeline line -->
+                    <div class="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-techGreen to-white/10 -ml-px"></div>
+                    
+                    <div class="relative flex flex-col md:flex-row items-start md:items-center w-full">
+                        <div class="md:w-1/2 md:pr-12 text-left md:text-right mb-6 md:mb-0 ml-16 md:ml-0">
+                            <h3 class="text-2xl font-bold text-techGreen mb-2">Short-Term</h3>
+                            <div class="text-white font-mono text-lg mb-4">Build Week (7 Days)</div>
+                            <p class="text-slate-400 font-light">The Vanguards Build Week is a one week proof of concept, not a manufacturing cycle, so the scope is deliberately three concrete, demonstrable pieces:</p>
+                        </div>
+                        
+                        <div class="absolute left-6 md:left-1/2 w-4 h-4 rounded-full bg-techGreen border-4 border-deepBlue shadow-[0_0_15px_rgba(0,255,102,0.6)] transform -translate-x-1/2 mt-1.5 md:mt-0"></div>
+                        
+                        <div class="md:w-1/2 md:pl-12 ml-16 md:ml-0 space-y-4">
+                            <div class="glass p-5 rounded-lg border-l-2 border-techGreen">
+                                <strong class="text-white block mb-1">Flight-dynamics simulation</strong>
+                                <span class="text-sm text-slate-400">Validating the vertical-to-horizontal tilt transition before anything physical gets committed to. A first working version, modeling flight phases, live gyroscopic torque, and telemetry, is already in progress.</span>
+                            </div>
+                            <div class="glass p-5 rounded-lg border-l-2 border-techGreen">
+                                <strong class="text-white block mb-1">Structural CAD design</strong>
+                                <span class="text-sm text-slate-400">The frame, wing spar, and duct/tilt-mechanism geometry, finalized and ready to start prototype fabrication post-event.</span>
+                            </div>
+                            <div class="glass p-5 rounded-lg border-l-2 border-techGreen">
+                                <strong class="text-white block mb-1">Early-stage AI Pilot model</strong>
+                                <span class="text-sm text-slate-400">Reads wind speed, wind direction, and obstacle data, and outputs propeller angle, thrust, optimum altitude, and a flight path, from a single destination input.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Long Term -->
+                <div class="relative fade-in stagger-1 pt-12">
+                    <!-- Timeline line -->
+                    <div class="absolute left-6 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-white/10 to-transparent -ml-px"></div>
+                    
+                    <div class="relative flex flex-col md:flex-row items-start md:items-center w-full">
+                        <div class="md:w-1/2 md:pr-12 text-left md:text-right mb-6 md:mb-0 ml-16 md:ml-0 md:order-1 order-2 mt-6 md:mt-0">
+                            <div class="glass p-6 rounded-lg border-l-2 md:border-l-0 md:border-r-2 border-neonBlue">
+                                <p class="text-slate-300 font-light leading-relaxed">
+                                    The target is a fully physical VTOL cargo drone with an AI pilot that handles flight operation and the transition phase seamlessly — reliable enough for real commercial delivery routes. Post-event, the first-year plan is to turn this into a working physical prototype and grow it into a startup.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="absolute left-6 md:left-1/2 w-4 h-4 rounded-full bg-neonBlue border-4 border-deepBlue shadow-[0_0_15px_rgba(0,229,255,0.6)] transform -translate-x-1/2 mt-1.5 md:mt-0 md:order-2 order-1"></div>
+                        
+                        <div class="md:w-1/2 md:pl-12 ml-16 md:ml-0 md:order-3 order-1">
+                            <h3 class="text-2xl font-bold text-neonBlue mb-2">Long-Term</h3>
+                            <div class="text-white font-mono text-lg mb-4">Beyond Build Week</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- The Team & Vision -->
+    <section class="py-24 px-6 relative border-t border-white/5 bg-gradient-to-b from-deepBlue to-black">
+        <div class="container mx-auto max-w-5xl">
+            <div class="grid lg:grid-cols-5 gap-12 items-center">
+                
+                <div class="lg:col-span-3 space-y-10 fade-in">
+                    <div>
+                        <h2 class="text-3xl font-bold mb-6 flex items-center gap-4">
+                            Why This, Why Now
+                            <span class="h-px bg-white/20 flex-grow"></span>
+                        </h2>
+                        <p class="text-lg text-slate-300 font-light leading-relaxed">
+                            Most student drone projects stop at a multirotor with a camera bolted on. This is a real aerospace control problem — tilt-transition dynamics, torque-cancelled counter-rotation, autonomous flight planning — scoped into something a small team can meaningfully move forward in a week, with a concrete path to a physical prototype and a startup beyond it.
+                        </p>
+                    </div>
+
+                    <div>
+                        <h2 class="text-3xl font-bold mb-6 flex items-center gap-4">
+                            The Team
+                            <span class="h-px bg-white/20 flex-grow"></span>
+                        </h2>
+                        <p class="text-lg text-slate-300 font-light leading-relaxed mb-8">
+                            We're building a small, high-execution crew rather than a large group. For a 7-day build with three concrete deliverables, a few people who can each own a piece end-to-end move faster than a large team that needs coordinating.
+                        </p>
+                        
+                        <div class="grid sm:grid-cols-3 gap-4">
+                            <div class="glass-panel p-5 rounded-lg border-t-2 border-t-techGreen hover:-translate-y-1 transition-transform">
+                                <div class="font-mono text-techGreen text-sm mb-2">01 // ROLE</div>
+                                <h4 class="font-bold text-white mb-2">Coders / Devs</h4>
+                                <p class="text-xs text-slate-400">AI pilot logic, flight control loop, sensor data handling.</p>
+                            </div>
+                            <div class="glass-panel p-5 rounded-lg border-t-2 border-t-neonBlue hover:-translate-y-1 transition-transform">
+                                <div class="font-mono text-neonBlue text-sm mb-2">02 // ROLE</div>
+                                <h4 class="font-bold text-white mb-2">Designers</h4>
+                                <p class="text-xs text-slate-400">Structural CAD, 3D modeling.</p>
+                            </div>
+                            <div class="glass-panel p-5 rounded-lg border-t-2 border-t-purple-400 hover:-translate-y-1 transition-transform">
+                                <div class="font-mono text-purple-400 text-sm mb-2">03 // ROLE</div>
+                                <h4 class="font-bold text-white mb-2">Strategists</h4>
+                                <p class="text-xs text-slate-400">Delivery/logistics use case and go-to-market thinking for the post-event roadmap.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-2 fade-in stagger-2">
+                    <div class="glass p-2 rounded-2xl relative">
+                        <div class="absolute inset-0 bg-gradient-to-br from-techGreen/20 to-neonBlue/20 blur-xl z-0"></div>
+                        <img src="https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&q=80&w=800" alt="Engineering Team" class="relative z-10 w-full h-auto rounded-xl object-cover mix-blend-luminosity hover:mix-blend-normal transition-all duration-500">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-8 border-t border-white/10 text-center relative z-10 bg-black">
+        <p class="font-mono text-slate-500 text-sm">
+            &copy; 2026 Project VAYU. Autonomous VTOL Cargo Systems.<br>
+            <span class="text-techGreen mt-2 inline-block">INITIATING SEQUENCE_</span>
+        </p>
+    </footer>
+
+    <!-- Scripts for Interactivity -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Intersection Observer for scroll animations (fade-ins)
+            const observerOptions = {
+                root: null,
+                rootMargin: '0px',
+                threshold: 0.15
+            };
+
+            const observer = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        
+                        // Handle counter animations
+                        const counters = entry.target.querySelectorAll('.counter-val');
+                        counters.forEach(counter => {
+                            if (!counter.classList.contains('counted')) {
+                                const target = parseFloat(counter.getAttribute('data-target'));
+                                const isFloat = target % 1 !== 0 || target === 3.0; // special case for 3.0
+                                animateValue(counter, 0, target, 2000, isFloat);
+                                counter.classList.add('counted');
+                            }
+                        });
+                        
+                        observer.unobserve(entry.target); // Run once
+                    }
+                });
+            }, observerOptions);
+
+            document.querySelectorAll('.fade-in').forEach(el => {
+                observer.observe(el);
+            });
+
+            // Smooth number counter function
+            function animateValue(obj, start, end, duration, isFloat) {
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    // easeOutQuart
+                    const ease = 1 - Math.pow(1 - progress, 4);
+                    const current = start + ease * (end - start);
+                    
+                    obj.innerHTML = isFloat ? current.toFixed(1) : Math.floor(current);
+                    
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
+        });
+    </script>
+</body>
+</html>
