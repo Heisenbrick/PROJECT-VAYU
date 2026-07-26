@@ -6,7 +6,7 @@
 **Project VAYU** is an autonomous Heavy-Lift VTOL (Vertical Take-Off and Landing) Cargo Drone system. 
 Designed by Team VAYU at S-VYASA campus, this project bridges the gap in modern drone delivery by providing a solution capable of lifting up to 80 kg payload with a compact 3x3m footprint. 
 
-Unlike conventional multirotor drones, VAYU utilizes four ducted, counter-rotating tilt-fans mounted on a fixed wing spar. This allows it to takeoff vertically and then transition to horizontal flight for high efficiency.
+Unlike conventional multirotor drones, VAYU utilizes two ducted, counter-rotating tilt-fans mounted on a fixed wing spar. This allows it to takeoff vertically and then transition to horizontal flight for high efficiency.
 
 ## Features
 - **Autonomous Flight:** Built-in AI pilot that handles flight operations, including the complex tilt-transition, from a single destination input.
